@@ -7,7 +7,11 @@ A [`tracing-subscriber`](https://docs.rs/tracing-subscriber/latest/tracing_subsc
 Add `tracing-build-script` to your dependencies
 
 ```toml
-[dependencies]
+[package]
+# ...
+build = "build.rs"
+
+[build-dependencies]
 # ...
 tracing-build-script = "0.1.0"
 tracing-subscriber = "0.3.19"
