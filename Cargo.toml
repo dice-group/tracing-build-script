@@ -2,7 +2,7 @@
 name = "tracing-build-script"
 version = "0.1.0"
 authors = ["Liss Heidrich <liss.heidrich@uni-paderborn.de>"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/dice-group/tracing-build-script"
 description = """
