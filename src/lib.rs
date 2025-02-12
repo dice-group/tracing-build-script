@@ -10,20 +10,6 @@ enum BuildScriptWriterInner {
 /// A writer intended to support the [output capturing of build scripts](https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script).
 /// `BuildScriptWriter` can be used by [`tracing_subscriber::fmt::Subscriber`](tracing_subscriber::fmt::Subscriber) or [`tracing_subscriber::fmt::Layer`](tracing_subscriber::fmt::Layer)
 /// to enable capturing output in build scripts.
-///
-/// # Logging Behaviour
-/// Events for Levels Error and Warn are printed to stdout with [`cargo::warning=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-warning) prepended.
-/// All other levels are sent to stderr, where they are only visible when running with verbose build output (`cargo build -vv`).
-///
-/// Note: this writer explicitly does **not** use the [`cargo::error=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-error) instruction
-/// because it aborts the build with an error, which is not always desired.
-///
-/// # Example
-/// ```
-/// tracing_subscriber::fmt()
-///     .with_writer(tracing_build_script::BuildScriptMakeWriter)
-///     .init();
-/// ```
 pub struct BuildScriptWriter(BuildScriptWriterInner);
 
 impl BuildScriptWriter {
@@ -63,6 +49,21 @@ impl io::Write for BuildScriptWriter {
     }
 }
 
+/// [`MakeWriter`](tracing_subscriber::fmt::MakeWriter) implementation for [`BuildScriptWriter`](BuildScriptWriter)
+///
+/// # Behaviour
+/// Events for Levels Error and Warn are printed to stdout with [`cargo::warning=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-warning) prepended.
+/// All other levels are sent to stderr, where they are only visible when running with verbose build output (`cargo build -vv`).
+///
+/// Note: this writer explicitly does **not** use the [`cargo::error=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-error) instruction
+/// because it aborts the build with an error, which is not always desired.
+///
+/// # Example
+/// ```
+/// tracing_subscriber::fmt()
+///     .with_writer(tracing_build_script::BuildScriptMakeWriter)
+///     .init();
+/// ```
 pub struct BuildScriptMakeWriter;
 
 impl<'a> MakeWriter<'a> for BuildScriptMakeWriter {
