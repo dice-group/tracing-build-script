@@ -1,6 +1,18 @@
 [package]
 name = "tracing-build-script"
 version = "0.1.0"
+authors = ["Liss Heidrich <liss.heidrich@uni-paderborn.de>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/dice-group/tracing-build-script"
+description = """
+Provides a tracing-subscriber compatible writer for use in build scripts.
+"""
+categories = [
+    "development-tools::debugging",
+    "development-tools::build-utils",
+]
+keywords = ["logging", "tracing", "build-script"]
 edition = "2021"
 
 [dependencies]
