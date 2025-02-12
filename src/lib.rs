@@ -7,13 +7,34 @@ enum BuildScriptWriterInner {
     ErrorsAndWarnings { first_write: bool, writer: io::Stdout },
 }
 
+/// A writer intended to support the [output capturing of build scripts](https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script).
+/// `BuildScriptWriter` can be used by [`tracing_subscriber::fmt::Subscriber`](tracing_subscriber::fmt::Subscriber) or [`tracing_subscriber::fmt::Layer`](tracing_subscriber::fmt::Layer)
+/// to enable capturing output in build scripts.
+///
+/// # Logging Behaviour
+/// Events for Levels Error and Warn are printed to stdout with [`cargo::warning=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-warning) prepended.
+/// All other levels are sent to stderr, where they are only visible when running with verbose build output (`cargo build -vv`).
+///
+/// Note: this writer explicitly does **not** use the [`cargo::error=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-error) instruction
+/// because it aborts the build with an error, which is not always desired.
+///
+/// # Example
+/// ```
+/// tracing_subscriber::fmt()
+///     .with_writer(tracing_build_script::BuildScriptMakeWriter)
+///     .init();
+/// ```
 pub struct BuildScriptWriter(BuildScriptWriterInner);
 
 impl BuildScriptWriter {
+    /// Create a writer for informational events.
+    /// Events will be written to stderr.
     pub fn informational() -> Self {
         Self(BuildScriptWriterInner::Informational(io::stderr()))
     }
 
+    /// Create a writer for warning and error events.
+    /// Events will be written to stdout after having `cargo::warning=` prepended.
     pub fn errors_and_warnings() -> Self {
         Self(BuildScriptWriterInner::ErrorsAndWarnings { first_write: true, writer: io::stdout() })
     }
