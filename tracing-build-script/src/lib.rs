@@ -86,6 +86,7 @@ impl Write for BuildScriptWriter {
                 // so we need to lock it to prevent other threads from clobbering our output.
                 let mut writer = writer.lock();
 
+                // depending on the current state we may need to prefix the output
                 match *state {
                     ErrorAndWarnState::Init => {
                         writer.write_all(b"cargo::warning=")?;
@@ -110,9 +111,7 @@ impl Write for BuildScriptWriter {
                 // We know which case we are in
                 //  either when we enter this function the next time (case 1)
                 //  or the next time or when we enter the destructor (case 2).
-                let last_char = buf.last().copied();
-
-                match last_char {
+                match buf.last().copied() {
                     Some(ch) if char_is_special(ch) => {
                         // we strip the special char at the end so that the call to split
                         // does not yield an empty slice in the end
