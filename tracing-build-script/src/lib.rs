@@ -113,8 +113,6 @@ impl Write for BuildScriptWriter {
                 //  or the next time or when we enter the destructor (case 2).
                 match buf.last().copied() {
                     Some(ch) if char_is_special(ch) => {
-                        // we strip the special char at the end so that the call to split
-                        // does not yield an empty slice in the end
                         buf = &buf[..buf.len() - 1];
                         *state = ErrorAndWarnState::LastCharWasSpecial(ch);
                     },
