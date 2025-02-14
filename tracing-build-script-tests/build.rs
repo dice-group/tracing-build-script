@@ -22,4 +22,5 @@ fn main() {
     write_message("\nwith\nnew\nlinestart");
     write_message("two\n\nnewlines");
     write_message("other\rspecial\tchar\0a\tb\"c\\");
+    write_message("two\nnewlines\natend\n\n");
 }

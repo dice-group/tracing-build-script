@@ -21,7 +21,9 @@ fn test_warn_and_error_output() {
         cargo::warning= WARN build_script_build: two\\n\\nnewlines\n\
         cargo::warning=ERROR build_script_build: two\\n\\nnewlines\n\
         cargo::warning= WARN build_script_build: other\\rspecial\tchar\0a\tb\"c\\\n\
-        cargo::warning=ERROR build_script_build: other\\rspecial\tchar\0a\tb\"c\\\n"
+        cargo::warning=ERROR build_script_build: other\\rspecial\tchar\0a\tb\"c\\\n\
+        cargo::warning= WARN build_script_build: two\\nnewlines\\natend\\n\\n\n\
+        cargo::warning=ERROR build_script_build: two\\nnewlines\\natend\\n\\n\n"
     );
 }
 
@@ -50,6 +52,9 @@ fn test_informational_output() {
         INFO build_script_build: two\n\nnewlines\n\
         TRACE build_script_build: other\rspecial\tchar\0a\tb\"c\\\n\
         DEBUG build_script_build: other\rspecial\tchar\0a\tb\"c\\\n \
-        INFO build_script_build: other\rspecial\tchar\0a\tb\"c\\\n"
+        INFO build_script_build: other\rspecial\tchar\0a\tb\"c\\\n\
+        TRACE build_script_build: two\nnewlines\natend\n\n\n\
+        DEBUG build_script_build: two\nnewlines\natend\n\n\n \
+        INFO build_script_build: two\nnewlines\natend\n\n\n"
     );
 }
