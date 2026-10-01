@@ -32,6 +32,8 @@ enum BuildScriptWriterInner {
     Informational(io::Stderr),
     ErrorsAndWarnings {
         state: ErrorAndWarnState,
+        /// `cargo::warning=` or `cargo::error=`
+        prefix: &'static [u8],
         writer: io::Stdout,
     },
 }
@@ -48,17 +50,31 @@ impl BuildScriptWriter {
         Self(BuildScriptWriterInner::Informational(io::stderr()))
     }
 
-    /// Create a writer for warning and error events.
+    /// Create a writer for error events.
+    /// Events will be written to stdout after having `cargo::error=` prepended,
+    /// which makes cargo fail the build once the build script has finished.
+    pub fn error() -> Self {
+        Self::prefixed(b"cargo::error=")
+    }
+
+    /// Create a writer for warning events.
     /// Events will be written to stdout after having `cargo::warning=` prepended.
-    pub fn errors_and_warnings() -> Self {
-        Self(BuildScriptWriterInner::ErrorsAndWarnings { state: ErrorAndWarnState::Init, writer: io::stdout() })
+    pub fn warning() -> Self {
+        Self::prefixed(b"cargo::warning=")
+    }
+
+    fn prefixed(prefix: &'static [u8]) -> Self {
+        Self(BuildScriptWriterInner::ErrorsAndWarnings { state: ErrorAndWarnState::Init, prefix, writer: io::stdout() })
     }
 }
 
 impl Drop for BuildScriptWriter {
     fn drop(&mut self) {
-        if let BuildScriptWriterInner::ErrorsAndWarnings { state: ErrorAndWarnState::LastCharWasSpecial(ch), writer } =
-            &mut self.0
+        if let BuildScriptWriterInner::ErrorsAndWarnings {
+            state: ErrorAndWarnState::LastCharWasSpecial(ch),
+            writer,
+            ..
+        } = &mut self.0
         {
             let _ = writer.write(&[*ch]);
         }
@@ -74,14 +90,14 @@ impl Write for BuildScriptWriter {
     fn flush(&mut self) -> io::Result<()> {
         match &mut self.0 {
             BuildScriptWriterInner::Informational(writer) => writer.flush(),
-            BuildScriptWriterInner::ErrorsAndWarnings { writer, state: _ } => writer.flush(),
+            BuildScriptWriterInner::ErrorsAndWarnings { writer, .. } => writer.flush(),
         }
     }
 
     fn write_all(&mut self, mut buf: &[u8]) -> io::Result<()> {
         match &mut self.0 {
             BuildScriptWriterInner::Informational(writer) => writer.write_all(buf),
-            BuildScriptWriterInner::ErrorsAndWarnings { state, writer } => {
+            BuildScriptWriterInner::ErrorsAndWarnings { state, writer, prefix } => {
                 // We will need to issue multiple write calls to the writer (to avoid heap allocation)
                 // so we need to lock it to prevent other threads from clobbering our output.
                 let mut writer = writer.lock();
@@ -89,7 +105,7 @@ impl Write for BuildScriptWriter {
                 // depending on the current state we may need to prefix the output
                 match *state {
                     ErrorAndWarnState::Init => {
-                        writer.write_all(b"cargo::warning=")?;
+                        writer.write_all(prefix)?;
                     },
                     ErrorAndWarnState::LastCharWasSpecial(ch) => {
                         writer.write_all(escape_special(ch))?;
@@ -165,16 +181,43 @@ impl Write for BuildScriptWriter {
 /// Events for Levels Error and Warn are printed to stdout with [`cargo::warning=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-warning) prepended.
 /// All other levels are sent to stderr, where they are only visible when running with verbose build output (`cargo build -vv`).
 ///
-/// Note: this writer explicitly does **not** use the [`cargo::error=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-error) instruction
-/// because it aborts the build with an error, which is not always desired.
+/// By default the [`cargo::error=`](https://doc.rust-lang.org/cargo/reference/build-scripts.html#cargo-error) instruction
+/// is **not** used because it fails the build, which is not always desired.
+/// Opt in with [`fail_on_error`](Self::fail_on_error) to print Error events with `cargo::error=` prepended instead.
 ///
 /// # Example
 /// ```
 /// tracing_subscriber::fmt()
-///     .with_writer(tracing_build_script::BuildScriptMakeWriter)
+///     .with_writer(tracing_build_script::BuildScriptMakeWriter::new())
 ///     .init();
 /// ```
-pub struct BuildScriptMakeWriter;
+#[derive(Default)]
+pub struct BuildScriptMakeWriter {
+    fail_on_error: bool,
+}
+
+impl BuildScriptMakeWriter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// If `true`, Error events are printed with `cargo::error=` prepended, which makes cargo
+    /// fail the build once the build script has finished. Defaults to `false`.
+    pub fn fail_on_error(mut self, fail_on_error: bool) -> Self {
+        self.fail_on_error = fail_on_error;
+        self
+    }
+
+    fn writer_for(&self, level: Level) -> BuildScriptWriter {
+        if level == Level::ERROR && self.fail_on_error {
+            BuildScriptWriter::error()
+        } else if level <= Level::WARN {
+            BuildScriptWriter::warning()
+        } else {
+            BuildScriptWriter::informational()
+        }
+    }
+}
 
 impl<'a> MakeWriter<'a> for BuildScriptMakeWriter {
     type Writer = BuildScriptWriter;
@@ -184,10 +227,31 @@ impl<'a> MakeWriter<'a> for BuildScriptMakeWriter {
     }
 
     fn make_writer_for(&'a self, meta: &Metadata) -> Self::Writer {
-        if meta.level() == &Level::ERROR || meta.level() == &Level::WARN {
-            BuildScriptWriter::errors_and_warnings()
-        } else {
-            BuildScriptWriter::informational()
+        self.writer_for(*meta.level())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prefix(writer: BuildScriptWriter) -> Option<&'static [u8]> {
+        match &writer.0 {
+            BuildScriptWriterInner::ErrorsAndWarnings { prefix, .. } => Some(prefix),
+            BuildScriptWriterInner::Informational(_) => None,
         }
+    }
+
+    #[test]
+    fn selects_prefix_by_level() {
+        let default = BuildScriptMakeWriter::new();
+        assert_eq!(prefix(default.writer_for(Level::ERROR)), Some(&b"cargo::warning="[..]));
+        assert_eq!(prefix(default.writer_for(Level::WARN)), Some(&b"cargo::warning="[..]));
+        assert_eq!(prefix(default.writer_for(Level::INFO)), None);
+
+        let failing = BuildScriptMakeWriter::new().fail_on_error(true);
+        assert_eq!(prefix(failing.writer_for(Level::ERROR)), Some(&b"cargo::error="[..]));
+        assert_eq!(prefix(failing.writer_for(Level::WARN)), Some(&b"cargo::warning="[..]));
+        assert_eq!(prefix(default.writer_for(Level::INFO)), None);
     }
 }
