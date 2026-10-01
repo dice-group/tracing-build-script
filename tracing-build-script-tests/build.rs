@@ -10,7 +10,7 @@ fn write_message(msg: &str) {
 
 fn main() {
     tracing_subscriber::fmt()
-        .with_writer(tracing_build_script::BuildScriptMakeWriter)
+        .with_writer(tracing_build_script::BuildScriptMakeWriter::new())
         .with_ansi(false)
         .without_time()
         .with_max_level(LevelFilter::TRACE)

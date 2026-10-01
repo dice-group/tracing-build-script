@@ -13,7 +13,7 @@ build = "build.rs"
 
 [build-dependencies]
 # ...
-tracing-build-script = "0.1.0"
+tracing-build-script = "0.2.0"
 tracing-subscriber = "0.3.19"
 ```
 
@@ -22,9 +22,12 @@ tracing-subscriber = "0.3.19"
 > ```rust
 > fn main() {
 >    tracing_subscriber::fmt()
->        .with_writer(tracing_build_script::BuildScriptMakeWriter)
+>        .with_writer(tracing_build_script::BuildScriptMakeWriter::new())
 >        .init();
 > 
 >    ...
 > }
 > ```
+
+By default, error and warn events are emitted as `cargo::warning=`, all other levels go to stderr (visible with `cargo build -vv`).
+To fail the build on error events instead, use `BuildScriptMakeWriter::new().fail_on_error(true)`.
